@@ -1,4 +1,5 @@
 """Script containing generic resources."""
+
 import logging
 from typing import List, Optional, Set, Union
 
@@ -10,7 +11,7 @@ from gnomad.resources.resource_utils import (
     VersionedVariantDatasetResource,
 )
 
-from gnomad_qc.v3.resources.basics import get_gnomad_v3_vds
+import gnomad_qc.v3.resources.basics as v3_basics
 from gnomad_qc.v4.resources.constants import (
     CURRENT_RAW_VERSION,
     CURRENT_SAMPLE_QC_VERSION,
@@ -39,8 +40,10 @@ def get_gnomad_v4_vds(
     n_partitions: Optional[int] = None,
     filter_partitions: Optional[List[int]] = None,
     chrom: Optional[Union[str, List[str], Set[str]]] = None,
+    autosomes_only: bool = False,
+    sex_chr_only: bool = False,
     filter_variant_ht: Optional[hl.Table] = None,
-    filter_intervals: Optional[List[str]] = None,
+    filter_intervals: Optional[List[Union[str, hl.tinterval]]] = None,
     split_reference_blocks: bool = True,
     remove_dead_alleles: bool = True,
     annotate_meta: bool = False,
@@ -69,6 +72,10 @@ def get_gnomad_v4_vds(
         partitions.
     :param filter_partitions: Optional argument to filter the VDS to specific partitions.
     :param chrom: Optional argument to filter the VDS to a specific chromosome(s).
+    :param autosomes_only: Whether to filter the VDS to autosomes only. Default is
+        False.
+    :param sex_chr_only: Whether to filter the VDS to sex chromosomes only. Default is
+        False.
     :param filter_variant_ht: Optional argument to filter the VDS to a specific set of
         variants. Only supported when splitting the VDS.
     :param filter_intervals: Optional argument to filter the VDS to specific intervals.
@@ -103,6 +110,19 @@ def get_gnomad_v4_vds(
 
     if isinstance(chrom, str):
         chrom = [chrom]
+
+    if autosomes_only or sex_chr_only:
+        rg = gnomad_v4_resource.vds().reference_genome
+        sex_chrom = set(rg.x_contigs + rg.y_contigs)
+        if sex_chr_only:
+            chrom = list(sex_chrom)
+        else:
+            chrom = list(set(rg.contigs) - (sex_chrom | set(rg.mt_contigs)))
+    elif autosomes_only and sex_chr_only:
+        raise ValueError(
+            "Only one of 'autosomes_only' or 'sex_chr_only' can be set to True."
+        )
+
     if n_partitions and chrom:
         logger.info(
             "Filtering to chromosome(s) %s with %s partitions...", chrom, n_partitions
@@ -141,10 +161,11 @@ def get_gnomad_v4_vds(
 
     if filter_intervals:
         logger.info("Filtering to %s intervals...", len(filter_intervals))
-        filter_intervals = [
-            hl.parse_locus_interval(x, reference_genome="GRCh38")
-            for x in filter_intervals
-        ]
+        if isinstance(filter_intervals[0], str):
+            filter_intervals = [
+                hl.parse_locus_interval(x, reference_genome="GRCh38")
+                for x in filter_intervals
+            ]
         vds = hl.vds.filter_intervals(
             vds, filter_intervals, split_reference_blocks=split_reference_blocks
         )
@@ -341,8 +362,10 @@ def get_gnomad_v4_genomes_vds(
     test: bool = False,
     filter_partitions: Optional[List[int]] = None,
     chrom: Optional[Union[str, List[str], Set[str]]] = None,
+    autosomes_only: bool = False,
+    sex_chr_only: bool = False,
     filter_variant_ht: Optional[hl.Table] = None,
-    filter_intervals: Optional[List[str]] = None,
+    filter_intervals: Optional[List[Union[str, hl.tinterval]]] = None,
     split_reference_blocks: bool = True,
     entries_to_keep: Optional[List[str]] = None,
     annotate_het_non_ref: bool = False,
@@ -362,6 +385,10 @@ def get_gnomad_v4_genomes_vds(
     :param filter_partitions: Optional argument to filter the VDS to specific partitions
         in the provided list.
     :param chrom: Optional argument to filter the VDS to a specific chromosome(s).
+    :param autosomes_only: Whether to filter the VDS to autosomes only. Default is
+        False.
+    :param sex_chr_only: Whether to filter the VDS to sex chromosomes only. Default is
+        False.
     :param filter_variant_ht: Optional argument to filter the VDS to a specific set of
         variants. Only supported when splitting the VDS.
     :param filter_intervals: Optional argument to filter the VDS to specific intervals.
@@ -374,7 +401,7 @@ def get_gnomad_v4_genomes_vds(
         '_het_non_ref') to the variant data. Default is False.
     :return: gnomAD v4 genomes VariantDataset with chosen annotations and filters.
     """
-    vds = get_gnomad_v3_vds(
+    vds = v3_basics.get_gnomad_v3_vds(
         split=split,
         remove_hard_filtered_samples=remove_hard_filtered_samples,
         release_only=False,
@@ -382,6 +409,8 @@ def get_gnomad_v4_genomes_vds(
         test=test,
         filter_partitions=filter_partitions,
         chrom=chrom,
+        autosomes_only=autosomes_only,
+        sex_chr_only=sex_chr_only,
         filter_variant_ht=filter_variant_ht,
         filter_intervals=filter_intervals,
         split_reference_blocks=split_reference_blocks,
