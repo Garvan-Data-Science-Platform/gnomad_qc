@@ -84,12 +84,24 @@ def import_truth_sets(overwrite: bool = False):
         "hybrid.m37m.vcf.bgz",
         "1000G_phase1.snps.high_confidence.b37.vcf.bgz",
     ]
+
     for truth_vcf in truth_sets:
+        print('truth set is ' + truth_vcf)
         mt_path = truth_vcf.replace(".vcf.bgz", ".mt")
         mt = hl.import_vcf("{}/source/{}".format(root, truth_vcf), min_partitions=10)
+        print('finished import_vcf')
+        if truth_vcf in [ "Mills_and_1000G_gold_standard.indels.b37.vcf.bgz", "1000G_phase1.snps.high_confidence.b37.vcf.bgz"]:
+            print('changing GQ type to int32')
+            mt = mt.annotate_entries(GQ=hl.int32(mt.GQ))
+        
+        if truth_vcf == "1000G_phase1.snps.high_confidence.b37.vcf.bgz":
+            print('changing PL type to int32')
+            mt = mt.annotate_entries(PL=mt.PL.map(hl.int32))
+        
         hl.split_multi_hts(mt).write(
             "{}/hail-{}/{}".format(root_out, CURRENT_HAIL_VERSION, mt_path), overwrite
         )
+        print('finished split_multi_hts')
 
 
 def main(args):
