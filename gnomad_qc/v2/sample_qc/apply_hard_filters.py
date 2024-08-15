@@ -139,7 +139,11 @@ def main(args):
 
     logger.info("Importing metadata...")
     meta_ht = hl.import_table(
-        qc_meta_path(data_type), impute=True, types={"age": hl.tfloat64}
+        MHbucket + '/metadata.tsv', types={"age": hl.tfloat64, "s":hl.tstr, 
+                                           "freemix": hl.tfloat64, "callrate": hl.tfloat64, 
+                                           "mean_dp": hl.tfloat64, "median_insert_size": hl.tfloat64, 
+                                           "releasable_2_1": hl.tbool, "pcr_free": hl.tbool,
+                                           "pct_chimeras": hl.tfloat64}
     ).key_by("s")
     qc_mt = qc_mt.annotate_cols(**meta_ht[qc_mt.s])
 
