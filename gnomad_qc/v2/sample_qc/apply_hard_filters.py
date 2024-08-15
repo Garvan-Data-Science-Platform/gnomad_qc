@@ -121,7 +121,7 @@ def main(args):
         logger.info("Importing data...")
         # 1h40 for exomes, 3h20 for genomes
         mt = get_gnomad_data(
-            data_type, raw=True, split=False
+            data_type, raw=True, split=False, meta_root=None
         )  # NOTE: using full calls since hardcalls doesn't exist at this stage
         logger.info(
             "Filtering to bi-allelic, high-callrate, common SNPs for sample QC..."
