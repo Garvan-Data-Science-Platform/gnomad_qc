@@ -5,12 +5,14 @@ from gnomad.utils.slack import slack_notifications
 from gnomad_qc.slack_creds import slack_token
 from gnomad_qc.v2.resources import *
 
+vep_config='gs://hail-us-central1-vep/vep85-loftee-gcloud.json'
+
 
 def import_clinvar(overwrite: bool = False):
     from datetime import datetime
-
+    
     clinvar_ht = hl.import_vcf(
-        clinvar_vcf_path, min_partitions=500, skip_invalid_loci=True
+        clinvar_vcf_path, min_partitions=500, skip_invalid_loci=True, force_bgz=True
     ).rows()
     clinvar_ht = clinvar_ht.annotate_globals(
         imported_on=datetime.now().strftime("%Y-%m-%d")
