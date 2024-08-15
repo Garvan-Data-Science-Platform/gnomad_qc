@@ -61,7 +61,8 @@ def import_exac_data(overwrite: bool = False):
     vcf_path = "gs://gcp-public-data--gnomad/legacy/exac_browser/ExAC.r1.sites.vep.vcf.gz"
     vds = hl.import_vcf(vcf_path, force_bgz=True, min_partitions=5000, array_elements_required=False).rows()
     vds = hl.split_multi_hts(vds)
-    vds = hl.vep(vds, vep_config)
+    #the input vcf looks like it already has VEP annotations
+    #vds = hl.vep(vds, vep_config)
     vds.write(exac_release_sites_ht_path(), overwrite)
 
 
