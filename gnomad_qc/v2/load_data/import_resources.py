@@ -7,6 +7,8 @@ from gnomad_qc.v2.resources import *
 
 vep_config='gs://hail-us-central1-vep/vep85-loftee-gcloud.json'
 
+#My bucket:
+MHbucket = 'gs://autism-crc-gnomad-mh-2'
 
 def import_clinvar(overwrite: bool = False):
     from datetime import datetime
@@ -75,7 +77,7 @@ def import_cpgs(overwrite: bool = False):
 
 def import_truth_sets(overwrite: bool = False):
     root = "gs://gcp-public-data--gnomad/truth-sets"
-    root_out = "gs://gnomad-public-requester-pays/truth-sets"
+    root_out = MHbucket + "/truth-sets"
     truth_sets = [
         "1000G_omni2.5.b37.vcf.bgz",
         "hapmap_3.3.b37.vcf.bgz",
