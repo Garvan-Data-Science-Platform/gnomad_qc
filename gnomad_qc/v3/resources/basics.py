@@ -10,6 +10,7 @@ from gnomad.resources.resource_utils import (
     VersionedVariantDatasetResource,
 )
 
+import gnomad_qc.v4.resources.basics as v4_basics
 from gnomad_qc.v3.resources.constants import CURRENT_RELEASE, CURRENT_VERSION
 from gnomad_qc.v3.resources.meta import meta
 from gnomad_qc.v3.resources.sample_qc import hard_filtered_samples
@@ -26,6 +27,13 @@ def get_gnomad_v3_vds(
     test: bool = False,
     filter_partitions: Optional[List[int]] = None,
     chrom: Optional[Union[str, List[str], Set[str]]] = None,
+    autosomes_only: bool = False,
+    sex_chr_only: bool = False,
+    filter_variant_ht: Optional[hl.Table] = None,
+    filter_intervals: Optional[List[Union[str, hl.tinterval]]] = None,
+    split_reference_blocks: bool = True,
+    entries_to_keep: Optional[List[str]] = None,
+    annotate_het_non_ref: bool = False,
 ) -> hl.vds.VariantDataset:
     """
     Get gnomAD VariantDataset with desired filtering and metadata annotations.
@@ -41,6 +49,20 @@ def get_gnomad_v3_vds(
     :param filter_partitions: Optional argument to filter the VDS to specific partitions
         in the provided list.
     :param chrom: Optional argument to filter the VDS to specific chromosomes.
+    :param autosomes_only: Whether to filter the VDS to autosomes only. Default is
+        False.
+    :param sex_chr_only: Whether to filter the VDS to sex chromosomes only. Default is
+        False.
+    :param filter_variant_ht: Optional argument to filter the VDS to a specific set of
+        variants. Only supported when splitting the VDS.
+    :param filter_intervals: Optional argument to filter the VDS to specific intervals.
+    :param split_reference_blocks: Whether to split the reference data at the edges of
+        the intervals defined by `filter_intervals`. Default is True.
+    :param entries_to_keep: Optional argument to keep only specific entries in the
+        returned VDS. If splitting the VDS, use the global entries (e.g. 'GT') instead
+        of the local entries (e.g. 'LGT') to keep.
+    :param annotate_het_non_ref: Whether to annotate non reference heterozygotes (as
+        '_het_non_ref') to the variant data. Default is False.
     :return: gnomAD v3 dataset with chosen annotations and filters.
     """
     if test:
@@ -51,6 +73,18 @@ def get_gnomad_v3_vds(
     if isinstance(chrom, str):
         chrom = [chrom]
 
+    if autosomes_only and sex_chr_only:
+        raise ValueError(
+            "Only one of 'autosomes_only' or 'sex_chr_only' can be set to True."
+        )
+    if autosomes_only or sex_chr_only:
+        rg = vds.reference_genome
+        sex_chrom = set(rg.x_contigs + rg.y_contigs)
+        if sex_chr_only:
+            chrom = sex_chrom
+        else:
+            chrom = set(rg.contigs) - (sex_chrom | set(rg.mt_contigs))
+
     if chrom is not None:
         logger.info("Filtering to chromosome(s) %s...", chrom)
         vds = hl.vds.filter_chromosomes(vds, keep=chrom)
@@ -60,6 +94,17 @@ def get_gnomad_v3_vds(
         vds = hl.vds.VariantDataset(
             vds.reference_data._filter_partitions(filter_partitions),
             vds.variant_data._filter_partitions(filter_partitions),
+        )
+
+    if filter_intervals:
+        logger.info("Filtering to %s intervals...", len(filter_intervals))
+        if isinstance(filter_intervals[0], str):
+            filter_intervals = [
+                hl.parse_locus_interval(x, reference_genome="GRCh38")
+                for x in filter_intervals
+            ]
+        vds = hl.vds.filter_intervals(
+            vds, filter_intervals, split_reference_blocks=split_reference_blocks
         )
 
     if remove_hard_filtered_samples:
@@ -83,19 +128,23 @@ def get_gnomad_v3_vds(
                 vds.reference_data, vd.annotate_cols(meta=meta_ht[vd.col_key])
             )
 
+    vd = vds.variant_data
+    if annotate_het_non_ref:
+        logger.info("Annotating non_ref hets to unsplit variant data...")
+        vd = vd.annotate_entries(_het_non_ref=vd.LGT.is_het_non_ref())
+        entries_to_keep = (
+            None if entries_to_keep is None else entries_to_keep + ["_het_non_ref"]
+        )
+
     if split:
-        vd = vds.variant_data
-        vd = vd.annotate_rows(
-            n_unsplit_alleles=hl.len(vd.alleles),
-            mixed_site=(hl.len(vd.alleles) > 2)
-            & hl.any(lambda a: hl.is_indel(vd.alleles[0], a), vd.alleles[1:])
-            & hl.any(lambda a: hl.is_snp(vd.alleles[0], a), vd.alleles[1:]),
+        vd = v4_basics._split_and_filter_variant_data_for_loading(
+            vd, filter_variant_ht, entries_to_keep
         )
-        vd = hl.experimental.sparse_split_multi(vd, filter_changed_loci=True)
-        vds = hl.vds.VariantDataset(
-            vds.reference_data,
-            vd,
-        )
+
+    if entries_to_keep is not None:
+        vd = vd.select_entries(*entries_to_keep)
+
+    vds = hl.vds.VariantDataset(vds.reference_data, vd)
 
     return vds
 
