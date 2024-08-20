@@ -1,4 +1,5 @@
-# Copy of v2 directory, amended for autism crc file locations
+# Copy of v2 directory, amended for use with autism_crc dataset, but meant to be more generic
+
 ## Contents and ordering of scripts
 The scripts below are run approximately in the order they are listed.
 
