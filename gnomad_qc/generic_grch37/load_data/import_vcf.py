@@ -7,7 +7,7 @@ from gnomad_qc.v2.resources import *
 def import_vcf(vcf,
                min_block_size: int = 1536,
                force_bgz: bool = True,
-               header):
+               header=None):
 
     hl.init(min_block_size=min_block_size)
 
