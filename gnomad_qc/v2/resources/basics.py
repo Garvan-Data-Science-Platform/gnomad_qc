@@ -635,6 +635,16 @@ NA12878_high_conf_exome_regions_bed_path = MHbucket + "/truth-sets/source/union1
 syndip_high_conf_regions_bed_path = (
     MHbucket + "/truth-sets/source/hybrid.m37m.bed"
 )
+# NCBI distributes GRCh37-based clinvar variants in VCF format, updated weekly, at https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/
+# Download:
+# wget https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/clinvar_20240624.vcf.gz
+# wget https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh37/clinvar_20240624.vcf.gz.tbi # the index file
+# 
+# Make a more manageable, smaller file for testing and development by using bcftools to retrieve a subset of variants restricted to sex chromosomes (X and Y) and a single autosome (22):
+# bcftools view -O z -o clinvar.2024-06-24.22XY.vcf.gz clinvar.vcf.gz 22,X,Y
+# Make the index file:
+# bcftools index -t clinvar.2024-06-24.22XY.vcf.gz
+
 clinvar_vcf_path = MHbucket + "/clinvar.2024-06-24.22XY.vcf.gz"
 clinvar_ht_path = MHbucket + "/clinvar/hail-0.2/clinvar.2024-06-24.22XY.vep.ht"
 
