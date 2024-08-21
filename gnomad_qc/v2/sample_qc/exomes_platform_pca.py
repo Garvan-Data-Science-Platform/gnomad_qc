@@ -1,3 +1,5 @@
+"""This script acts only on exome data so not of relevance to Autism CRC dataset"""
+
 import argparse
 import logging
 

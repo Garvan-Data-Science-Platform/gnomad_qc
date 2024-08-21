@@ -1,3 +1,5 @@
+"""RF = random forest. RF model is used to estimate ancestry."""
+
 import argparse
 import logging
 import sys

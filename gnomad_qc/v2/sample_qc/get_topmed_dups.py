@@ -1,3 +1,5 @@
+"""gnomad excludes samples which might also be members of the topmed study. Autism CRC won't do this so can disregard topmed annotions done here and in finalize_sample_qc.py."""
+
 import argparse
 import logging
 import sys
