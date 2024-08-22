@@ -5,12 +5,16 @@ from gnomad.utils.slack import slack_notifications
 from gnomad_qc.slack_creds import slack_token
 from gnomad_qc.v2.resources import *
 
+vep_config='gs://hail-us-central1-vep/vep85-loftee-gcloud.json'
+
+#My bucket:
+MHbucket = 'gs://autism-crc-gnomad-mh-2'
 
 def import_clinvar(overwrite: bool = False):
     from datetime import datetime
-
+    
     clinvar_ht = hl.import_vcf(
-        clinvar_vcf_path, min_partitions=500, skip_invalid_loci=True
+        clinvar_vcf_path, min_partitions=500, skip_invalid_loci=True, force_bgz=True
     ).rows()
     clinvar_ht = clinvar_ht.annotate_globals(
         imported_on=datetime.now().strftime("%Y-%m-%d")
@@ -40,25 +44,27 @@ def import_methylation(overwrite: bool = False):
     kt = kt.transmute(locus=hl.locus(kt.CHROM, kt.POS))
     kt.key_by("locus").write(methylation_sites_ht_path(), overwrite)
 
-    ht = hl.read_table(methylation_sites_ht_path())
-    ref_37 = hl.get_reference("GRCh37")
-    ref_38 = hl.get_reference("GRCh38")
-    ref_37.add_liftover(
-        "gs://hail-common/references/grch37_to_grch38.over.chain.gz", ref_38
-    )
-    ht = ht.annotate(
-        new_locus=hl.liftover(ht.locus, "GRCh38", include_strand=True),
-        old_locus=ht.locus,
-    )
-    ht = ht.key_by(locus=ht.new_locus.result)
-    ht.write(methylation_sites_ht_path(ref="GRCh38"), overwrite=overwrite)
+    # the rest of this function seems to be just making the GRCh38 version:
+    # ht = hl.read_table(methylation_sites_ht_path())
+    # ref_37 = hl.get_reference("GRCh37")
+    # ref_38 = hl.get_reference("GRCh38")
+    # ref_37.add_liftover(
+    #     "gs://hail-common/references/grch37_to_grch38.over.chain.gz", ref_38
+    # )
+    # ht = ht.annotate(
+    #     new_locus=hl.liftover(ht.locus, "GRCh38", include_strand=True),
+    #     old_locus=ht.locus,
+    # )
+    # ht = ht.key_by(locus=ht.new_locus.result)
+    # ht.write(methylation_sites_ht_path(ref="GRCh38"), overwrite=overwrite)
 
 
 def import_exac_data(overwrite: bool = False):
-    vcf_path = "gs://gnomad/raw/source/ExAC.r1.sites.vep.vcf.gz"
-    vds = hl.import_vcf(vcf_path, force_bgz=True, min_partitions=5000).rows()
+    vcf_path = "gs://gcp-public-data--gnomad/legacy/exac_browser/ExAC.r1.sites.vep.vcf.gz"
+    vds = hl.import_vcf(vcf_path, force_bgz=True, min_partitions=5000, array_elements_required=False).rows()
     vds = hl.split_multi_hts(vds)
-    vds = hl.vep(vds, vep_config)
+    #the input vcf looks like it already has VEP annotations
+    #vds = hl.vep(vds, vep_config)
     vds.write(exac_release_sites_ht_path(), overwrite)
 
 
@@ -71,7 +77,7 @@ def import_cpgs(overwrite: bool = False):
 
 def import_truth_sets(overwrite: bool = False):
     root = "gs://gcp-public-data--gnomad/truth-sets"
-    root_out = "gs://gnomad-public-requester-pays/truth-sets"
+    root_out = MHbucket + "/truth-sets"
     truth_sets = [
         "1000G_omni2.5.b37.vcf.bgz",
         "hapmap_3.3.b37.vcf.bgz",
@@ -80,12 +86,24 @@ def import_truth_sets(overwrite: bool = False):
         "hybrid.m37m.vcf.bgz",
         "1000G_phase1.snps.high_confidence.b37.vcf.bgz",
     ]
+
     for truth_vcf in truth_sets:
+        print('truth set is ' + truth_vcf)
         mt_path = truth_vcf.replace(".vcf.bgz", ".mt")
         mt = hl.import_vcf("{}/source/{}".format(root, truth_vcf), min_partitions=10)
+        print('finished import_vcf')
+        if truth_vcf in [ "Mills_and_1000G_gold_standard.indels.b37.vcf.bgz", "1000G_phase1.snps.high_confidence.b37.vcf.bgz"]:
+            print('changing GQ type to int32')
+            mt = mt.annotate_entries(GQ=hl.int32(mt.GQ))
+        
+        if truth_vcf == "1000G_phase1.snps.high_confidence.b37.vcf.bgz":
+            print('changing PL type to int32')
+            mt = mt.annotate_entries(PL=mt.PL.map(hl.int32))
+        
         hl.split_multi_hts(mt).write(
             "{}/hail-{}/{}".format(root_out, CURRENT_HAIL_VERSION, mt_path), overwrite
         )
+        print('finished split_multi_hts')
 
 
 def main(args):

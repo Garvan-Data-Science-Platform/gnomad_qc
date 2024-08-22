@@ -121,27 +121,37 @@ def main(args):
         logger.info("Importing data...")
         # 1h40 for exomes, 3h20 for genomes
         mt = get_gnomad_data(
-            data_type, raw=True, split=False
+            data_type, raw=True, split=False, meta_root=None
         )  # NOTE: using full calls since hardcalls doesn't exist at this stage
         logger.info(
             "Filtering to bi-allelic, high-callrate, common SNPs for sample QC..."
         )
+        mt.describe()
         mt = mt.filter_rows(
             (hl.len(mt.alleles) == 2)
             & hl.is_snp(mt.alleles[0], mt.alleles[1])
             & (hl.agg.mean(mt.GT.n_alt_alleles()) / 2 > 0.001)
             & (hl.agg.fraction(hl.is_defined(mt.GT)) > 0.99)
         )
+        logger.info("writing " + qc_mt_path(data_type))
         mt.annotate_cols(callrate=hl.agg.fraction(hl.is_defined(mt.GT))).naive_coalesce(
             5000
         ).write(qc_mt_path(data_type), overwrite=args.overwrite)
     qc_mt = hl.read_matrix_table(qc_mt_path(data_type))
 
+    print('before adding metadata:')
+    qc_mt.describe()
     logger.info("Importing metadata...")
     meta_ht = hl.import_table(
-        qc_meta_path(data_type), impute=True, types={"age": hl.tfloat64}
+        MHbucket + '/metadata.tsv', types={"age": hl.tfloat64, "s":hl.tstr, 
+                                           "freemix": hl.tfloat64, "callrate": hl.tfloat64, 
+                                           "mean_dp": hl.tfloat64, "median_insert_size": hl.tfloat64, 
+                                           "releasable_2_1": hl.tbool, "pcr_free": hl.tbool,
+                                           "pct_chimeras": hl.tfloat64}
     ).key_by("s")
     qc_mt = qc_mt.annotate_cols(**meta_ht[qc_mt.s])
+    print('after adding metadata:')
+    qc_mt.describe()
 
     logger.info("Inferring sex...")
     qc_ht = annotate_sex(
@@ -174,6 +184,8 @@ def main(args):
         )
     else:
         qc_ht = qc_ht.annotate(ambiguous_sex=hl.is_missing(qc_ht.is_female))
+    print('after sex inference:')
+    qc_ht.describe()
 
     logger.info("Annotating samples failing hard filters...")
     if args.exomes:

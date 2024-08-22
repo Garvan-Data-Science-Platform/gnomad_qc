@@ -1,7 +1,7 @@
 import hail as hl
 from gnomad.utils.liftover import get_liftover_genome
 
-from .basics import DataException, get_gnomad_meta
+from .basics import DataException, get_gnomad_meta, MHbucket
 
 
 def get_liftover_v2_qc_mt(
@@ -57,7 +57,7 @@ def qc_mt_path(
         raise DataException('reference_genome must be one of "GRCh37" or "GRCh38"')
 
     ld_pruned = ".pruned" if ld_pruned else ""
-    return f"gs://gnomad/sample_qc/mt/gnomad.{data_type}.high_callrate_common_biallelic_snps{ld_pruned}{ref_str}.mt"
+    return MHbucket + f"/autism_crc.high_callrate_common_biallelic_snps{ld_pruned}{ref_str}.mt"
 
 
 def qc_ht_path(data_type: str, part: str) -> str:
@@ -76,7 +76,7 @@ def qc_ht_path(data_type: str, part: str) -> str:
         )
     if data_type == "genomes" and part == "platforms":
         raise DataException("'platforms' only available for 'genomes'")
-    return f"gs://gnomad/sample_qc/ht/gnomad.{data_type}.{part}.ht"
+    return MHbucket + f"/sample_qc/gnomad.{data_type}.{part}.ht"
 
 
 def rank_annotations_path(data_type: str) -> str:
@@ -87,7 +87,7 @@ def rank_annotations_path(data_type: str) -> str:
         raise DataException(
             "Select data_type as one of 'genomes' or 'exomes' or 'joint'"
         )
-    return f"gs://gnomad/sample_qc/tsv/gnomad.{data_type}.rank_list_annotations.txt.bgz"
+    return MHbucket + f"/sample_qc/tsv/gnomad.{data_type}.rank_list_annotations.txt.bgz"
 
 
 def qc_temp_data_prefix(data_type: str) -> str:
@@ -98,7 +98,7 @@ def qc_temp_data_prefix(data_type: str) -> str:
         raise DataException(
             "Select data_type as one of 'genomes' or 'exomes' or 'joint'"
         )
-    return f"gs://gnomad/sample_qc/temp/{data_type}/gnomad.{data_type}"
+    return MHbucket + f"/sample_qc/temp/{data_type}"
 
 
 def qc_meta_path(data_type: str) -> str:

@@ -1,3 +1,5 @@
+"""FAF = 'filtering allele frequency'"""
+
 import argparse
 import logging
 import sys
